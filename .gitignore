@@ -2,7 +2,12 @@ __pycache__/
 *.pyc
 .ipynb_checkpoints/
 
+# Restricted real-data inputs and outputs: never commit.
 data/
+*.rds
+results/gps_*
+results/overlap_realdata.csv
+results/oscar_realdata.csv
 
 # Build outputs (regenerate with make_tables.py, make_figures.py, and the runners).
 tables/
