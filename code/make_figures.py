@@ -87,7 +87,7 @@ def bias_sweep() -> None:
     df["bias_strength"] = df["bias_strength"].astype(float)
     sub = df[(df["dgp"] == "balanced") & (df["bias"] == "comparative") & (df["n_R"] == df["n_R"].max())].copy()
     # MR-OSCAR, R-OSCAR, and CALM differ by less than 1e-4 at every point in this
-    # harness; plot MR-OSCAR rows under the collapsed OSCAR/CALM label.
+    # implementation; plot MR-OSCAR rows under the collapsed OSCAR/CALM label.
     methods = ["B-CALM", "OSCAR/CALM", "pooled", "CF", "RCT-only"]
     source = {"OSCAR/CALM": "MR-OSCAR"}
     styles = {

@@ -77,8 +77,8 @@ def write_main() -> None:
     if "bias_strength" not in df.columns:
         df["bias_strength"] = np.where(df["bias"].eq("comparative"), 0.2, 0.0)
     df["bias_strength"] = df["bias_strength"].astype(float)
-    # R-OSCAR, MR-OSCAR, and CALM coincide to within Monte Carlo noise in this
-    # harness; report them as a single OSCAR/CALM row (MR-OSCAR rows).
+    # R-OSCAR, MR-OSCAR, and CALM differ by less than 1e-4 in every cell of this
+    # implementation; report them as a single OSCAR/CALM row (MR-OSCAR rows).
     df = df[~df["method"].isin(["R-OSCAR", "CALM"])].copy()
     df["method"] = df["method"].replace({"MR-OSCAR": "OSCAR/CALM"})
     # The full main-results table cannot fit on a single page,
@@ -90,8 +90,8 @@ def write_main() -> None:
         "with the lowest negative-transfer rate and underline the method with coverage closest to "
         "the 90\\% target from below. Pooled and CF (the Wager causal forest) achieve lower RMSE "
         "under no bias because pooling is variance-optimal there, but their coverage collapses "
-        "under comparative bias. R-OSCAR, MR-OSCAR, and CALM coincide to within Monte Carlo noise "
-        "in this harness and are merged into a single OSCAR/CALM row; the family sits just below "
+        "under comparative bias. R-OSCAR, MR-OSCAR, and CALM differ by less than $10^{-4}$ in every cell "
+        "of this implementation and are merged into a single OSCAR/CALM row; the family sits just below "
         "nominal coverage on average while declining to borrow under bias. The Hahn Bayesian "
         "causal forest (BCF) is run only in the real-data analysis. Bias-limited width saturation "
         "is guaranteed by Corollary~\\ref{thm:scalar}."
@@ -172,7 +172,7 @@ def write_semi() -> None:
     lines = table_header(
         "STAR-like semi-synthetic benchmark with known potential outcomes "
         "(50 replicates; construction in Appendix~\\ref{app:semi-construction}). "
-        "MR-OSCAR represents the OSCAR/CALM family, whose members coincide in this harness; "
+        "MR-OSCAR represents the OSCAR/CALM family, whose members agree to within $10^{-7}$ in the factorial study; "
         "it is the family member run in this study.",
         "tab:semi",
     )
@@ -216,14 +216,15 @@ MAIN_SUMMARY_CAPTION = (
     "Synthetic factorial study: metric averages over the full condition grid ($24$ cells $\\times$ $50$ replicates; "
     "Appendix~\\ref{app:dgp-synthetic}). Cov.\\ and Width refer to pointwise 90\\% credible intervals evaluated on "
     "trial-distribution covariates; NT is the negative-transfer rate relative to RCT-only. R-OSCAR, MR-OSCAR, and CALM "
-    "are reported separately. Per-cell results: Appendix~\\ref{app:main-table}, Table~\\ref{tab:main}."
+    "are reported jointly as OSCAR/CALM. Per-cell results: Appendix~\\ref{app:main-table}, Table~\\ref{tab:main}."
 )
-MAIN_SUMMARY_ORDER = ["B-CALM", "R-OSCAR", "MR-OSCAR", "CALM", "RCT-only", "pooled", "OS-only", "CF"]
+MAIN_SUMMARY_ORDER = ["B-CALM", "OSCAR/CALM", "RCT-only", "pooled", "OS-only", "CF"]
 
 
 def write_main_summary(out_dir: Path = TABLES_DIR) -> None:
-    """Write the factorial summary with a separate row for each method."""
+    """Write the factorial summary, with one OSCAR/CALM row for the three family members."""
     df = pd.read_csv(RESULTS_DIR / "main.csv")
+    df = df[~df["method"].isin(["R-OSCAR", "CALM"])].replace({"method": {"MR-OSCAR": "OSCAR/CALM"}})
     summary = df.groupby("method")[["cate_rmse", "coverage_90", "ci_width", "neg_transfer"]].mean()
     lines = table_header(MAIN_SUMMARY_CAPTION, "tab:main_summary")
     lines += ["\\begin{tabular}{@{}lrrrr@{}}", "\\toprule", "Method   & RMSE  & Cov. & Width & NT \\\\", "\\midrule"]
