@@ -1,9 +1,10 @@
 numpy==1.26.4
-pandas==2.3.3
+pandas==1.5.3
 scipy==1.15.3
 scikit-learn==1.6.1
 matplotlib==3.10.6
 joblib==1.5.2
 # econml is only needed for the CF (causal forest) baseline; all B-CALM,
-# RCT-only, pooled, and OS-only experiments run without it.
+# RCT-only, pooled, OS-only, scalar-discrepancy, and QR-learner experiments
+# run without it.
 econml==0.16.0

@@ -21,16 +21,18 @@ from bcalm import BCalmLinear, BCalmMixture
 os.environ.setdefault("MPLCONFIGDIR", "/tmp/matplotlib")
 
 # The R-OSCAR / MR-OSCAR / CALM calibrated-borrowing baselines are the prior
-# works and live in a separate companion repository (not part of this release).
-# We import them lazily and degrade gracefully when that repo is absent: the
-# rest of this module (and all B-CALM experiments) import and run regardless.
+# works and live in the companion repository https://github.com/AsiaeeLab/calm-cate
+# (not part of this release). We import them lazily and degrade gracefully when
+# that repository is absent: the rest of this module (and all B-CALM
+# experiments) import and run regardless.
 #
 #   R-OSCAR:  arXiv:2306.17478
 #   MR-OSCAR: arXiv:2603.17066
 #   CALM:     arXiv:2603.19186
 #
-# To enable these baselines, check out the companion code locally and point the
-# environment variable BCALM_EXTERNAL_CALM_PATH at it.
+# To enable these baselines, clone AsiaeeLab/calm-cate and point the environment
+# variable BCALM_EXTERNAL_CALM_PATH at the root of that checkout (the directory
+# that contains src/).
 _ENV_EXTERNAL = os.environ.get("BCALM_EXTERNAL_CALM_PATH")
 EXTERNAL_MISMATCH_CODE = Path(_ENV_EXTERNAL) if _ENV_EXTERNAL else None
 
@@ -151,7 +153,13 @@ def fit_bcalm_selected(
     basis_kind: str,
     seed: int,
     sigma_y: float = 1.0,
+    *,
+    sigma0: float = 0.6,
+    prior_weights: np.ndarray | None = None,
 ) -> tuple[BCalmMixture, str]:
+    prior = SIGMA_MODEL_PRIOR if prior_weights is None else np.asarray(prior_weights, dtype=float)
+    if prior.shape != (len(SIGMA_GRID),) or not np.all(np.isfinite(prior)) or np.any(prior <= 0):
+        raise ValueError("prior_weights must contain six finite positive weights.")
     rct_contrast = BCalmLinear(sigma_delta=math.inf, sigma0=math.inf, sigma_y=sigma_y, basis_kind=basis_kind).fit(D_R, None)
     os_contrast = BCalmLinear(sigma_delta=0.0, sigma0=0.6, sigma_y=sigma_y, basis_kind=basis_kind).fit(None, D_O)
     tau_r = rct_contrast.mean_[rct_contrast.tau_slice]
@@ -161,12 +169,12 @@ def fit_bcalm_selected(
     models = []
     logps = []
     for sigma in SIGMA_GRID:
-        model = BCalmLinear(sigma_delta=sigma, sigma0=0.6, sigma_y=sigma_y, basis_kind=basis_kind)
+        model = BCalmLinear(sigma_delta=sigma, sigma0=sigma0, sigma_y=sigma_y, basis_kind=basis_kind)
         model.fit(D_R, D_O)
         models.append(model)
         logps.append(_contrast_log_marginal(tau_r, cov_r, tau_o, cov_o, sigma))
     logps_arr = np.asarray(logps, dtype=float)
-    logps_arr = logps_arr + np.log(SIGMA_MODEL_PRIOR)
+    logps_arr = logps_arr + np.log(prior)
     weights = np.exp(logps_arr - logsumexp(logps_arr))
     mixture = BCalmMixture(models, weights)
     mixture.sigma_grid_ = tuple(SIGMA_GRID)
@@ -327,8 +335,7 @@ class BcfHahnCate:
 
         BART posteriors are evaluated at training X. For new X, we use 1-NN
         lookup on the pooled training X to project posterior tau draws onto X_eval.
-        Cheap, deterministic, and adequate for the real-data-scale evaluation. The
-        canonical pmb.predict path can be substituted later if needed.
+        Cheap, deterministic, and adequate for the real-data-scale evaluation.
         """
         from sklearn.neighbors import NearestNeighbors
         nn = NearestNeighbors(n_neighbors=1).fit(self.x_template)
@@ -673,9 +680,9 @@ def fit_method(
                 f"The '{method}' baseline is a prior calibrated-borrowing method "
                 "(R-OSCAR: arXiv:2306.17478; MR-OSCAR: arXiv:2603.17066; "
                 "CALM: arXiv:2603.19186) and requires its companion code, which is "
-                "not part of this release. Check out the companion repository "
-                "locally and set the environment variable BCALM_EXTERNAL_CALM_PATH "
-                "to its path to enable these baselines."
+                "not part of this release. Clone https://github.com/AsiaeeLab/calm-cate "
+                "and set the environment variable BCALM_EXTERNAL_CALM_PATH to the root "
+                "of that checkout to enable these baselines."
             )
         return _fit_oscar_like(method, D_R, D_O, seed, bootstrap_b=bootstrap_b, workers=workers), "external"
     raise ValueError(f"Unknown method: {method}")
@@ -695,9 +702,6 @@ def fit_ablation(
     if variant == "No b_delta":
         return BCalmLinear(sigma_delta=0.0, sigma0=0.6, sigma_y=sigma_y, basis_kind=basis_kind).fit(D_R, D_O)
     if variant == "No b0":
-        return BCalmLinear(sigma_delta=0.2, sigma0=0.0, sigma_y=sigma_y, basis_kind=basis_kind).fit(D_R, D_O)
-    if variant == "Deterministic encoders":
-        return BCalmLinear(sigma_delta=0.2, sigma0=0.6, sigma_y=sigma_y, basis_kind=basis_kind).fit(D_R, D_O).scaled_covariance(0.55)
-    if variant == "Point plus bootstrap":
-        return BCalmLinear(sigma_delta=0.0, sigma0=0.0, sigma_y=sigma_y, basis_kind=basis_kind).fit(D_R, D_O).scaled_covariance(0.80)
+        model, _ = fit_bcalm_selected(D_R, D_O, basis_kind, seed, sigma_y=sigma_y, sigma0=0.0)
+        return model
     raise ValueError(f"Unknown ablation: {variant}")

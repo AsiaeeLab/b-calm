@@ -1,0 +1,60 @@
+{
+  "ablation_full": {
+    "details": {
+      "rows_file": "results/ablation.csv",
+      "seeds": 50
+    },
+    "formatted": "2.5s",
+    "seconds": 2.5142147541046143,
+    "timestamp": "2026-10-22 04:58:00"
+  },
+  "calibration_full": {
+    "details": {
+      "rows_file": "results/calibration.csv",
+      "seeds": 200
+    },
+    "formatted": "23.4m",
+    "seconds": 1404.7320880889893,
+    "timestamp": "2026-07-04 13:13:01"
+  },
+  "figures": {
+    "details": {},
+    "formatted": "1.1s",
+    "seconds": 1.1134562492370605,
+    "timestamp": "2026-07-04 13:13:16"
+  },
+  "main_full": {
+    "details": {
+      "rows_file": "results/main.csv",
+      "seeds": 50
+    },
+    "formatted": "1.7m",
+    "seconds": 101.33871555328369,
+    "timestamp": "2026-07-04 12:49:36"
+  },
+  "saturation_full": {
+    "details": {
+      "rows_file": "results/saturation.csv",
+      "seeds": 50
+    },
+    "formatted": "23.0s",
+    "seconds": 23.04454517364502,
+    "timestamp": "2026-05-04 02:11:58"
+  },
+  "semi_full": {
+    "details": {
+      "rows_file": "results/semi.csv",
+      "seeds": 50,
+      "sensitivity_file": "results/semi_sensitivity.csv"
+    },
+    "formatted": "7.2s",
+    "seconds": 7.230083465576172,
+    "timestamp": "2026-07-04 13:13:10"
+  },
+  "tables": {
+    "details": {},
+    "formatted": "0.1s",
+    "seconds": 0.12072992324829102,
+    "timestamp": "2026-07-04 13:15:20"
+  }
+}

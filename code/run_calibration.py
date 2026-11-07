@@ -91,14 +91,20 @@ def main() -> None:
             raise
         progress(index, len(seeds), start, "calibration", every=10)
     method_names = ["B-CALM" if m == "B-CALM-selected" else m for m in methods]
+    # A method skipped for a missing optional dependency has no fits; omit it
+    # rather than writing zero-coverage rows.
+    skipped = [m for m in method_names if not any(cover_n[(m, alpha)] for alpha in alphas)]
+    if skipped:
+        log("no fits for " + ", ".join(skipped) + "; omitted from the output")
     rows = [
         {
             "method": method,
             "alpha": alpha,
-            "empirical_coverage": cover_sum[(method, alpha)] / max(cover_n[(method, alpha)], 1),
+            "empirical_coverage": cover_sum[(method, alpha)] / cover_n[(method, alpha)],
             "n_seeds": n_seeds,
         }
         for method in method_names
+        if method not in skipped
         for alpha in alphas
     ]
     output = RESULTS_DIR / filename

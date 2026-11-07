@@ -106,17 +106,14 @@ def main() -> None:
         with output.open(newline="") as handle:
             reader = csv.DictReader(handle)
             if reader.fieldnames != FIELDNAMES:
-                archived = output.with_suffix(output.suffix + ".pre_bias_strength")
-                output.replace(archived)
-                log(f"archived incompatible {output.name} to {archived.name}")
+                raise ValueError(f"{output} has unexpected columns; move it aside before running.")
     done = read_done(output, ["method", "dgp", "bias", "bias_strength", "n_R", "n_O", "seed"])
     methods = filter_methods(["B-CALM-selected", "RCT-only", "CF", "MR-OSCAR", "R-OSCAR", "CALM", "pooled", "OS-only"])
     sweep_methods = filter_methods(["B-CALM-selected", "RCT-only", "CF", "MR-OSCAR", "R-OSCAR", "CALM", "pooled"])
-    # BCF (Hahn 2020) is intentionally skipped in the synthetic factorial grid.
-    # Each BCF Hahn fit takes ~30s-2min depending on n; with 25 cells * 50 seeds
-    # the cost is prohibitive for an overnight rerun. BCF is reported in the
-    # paper's real-data application, where a single fit per seed is feasible
-    # and the Bayesian-peer claim is most informative.
+    # BCF (Hahn 2020) is skipped in the synthetic factorial grid: each fit takes
+    # roughly 30 s to 2 min depending on n, which is prohibitive over the full
+    # grid of cells and seeds. BCF is reported in the paper's real-data
+    # application, where a single fit is feasible.
     n_O = 5000 if args.mode != "smoke" else 160
     total = len(cells) * len(n_R_grid) * len(seeds)
     start = time.time()
@@ -153,7 +150,7 @@ def main() -> None:
                             continue
                         # BCF (Hahn) has Bayesian credible intervals from posterior MCMC; not bootstrapped.
                         # CF (Wager-Athey) has EconML's asymptotic IF-based SE; not bootstrapped here.
-                        # Only OSCAR family was using the variance_scale heuristic, replaced by bootstrap.
+                        # The OSCAR family gets bootstrap intervals.
                         use_bootstrap = method in {"MR-OSCAR", "R-OSCAR", "CALM"}
                         try:
                             model, chosen_sigma = fit_method(

@@ -1,59 +1,160 @@
-# B-CALM: Bias-Limited Bayesian Borrowing for RCT-Anchored Conditional Treatment Effects under Covariate Mismatch — experiment code
+# B-CALM: Bias-Limited Bayesian Borrowing for RCT-Defined Conditional Average Treatment Effects under Covariate Mismatch
 
-This repository contains the experiment code for B-CALM. B-CALM estimates a conditional average treatment effect (CATE) by anchoring on a randomized controlled trial (RCT) and borrowing strength from an observational study whose covariates only partially overlap the trial's. A Gaussian-prior contrast model places a calibrated prior on the trial-vs-observational effect discrepancy, so the amount of borrowing is limited by how much the two sources actually disagree: when the observational arm is unbiased the posterior tightens toward the pooled estimate, and when it is biased the borrowing saturates and the posterior falls back toward the RCT-only estimate. A Bayesian model average over the discrepancy-prior scale selects the borrowing strength automatically, yielding calibrated credible intervals and bounded negative transfer. The main, semi-synthetic, and calibration studies all run B-CALM with this empirical-Bayes model averaging under fixed asymmetric prior weights over the $\sigma_\Delta$ grid (`SIGMA_MODEL_PRIOR` in `code/baselines.py`); the main grid additionally exports each replicate's posterior weights to `results/bma_weights.csv`.
+Code for the NeurIPS 2026 paper by Amir Asiaee and Samhita Pal.
 
-## Install
+B-CALM estimates the conditional average treatment effect (CATE) defined by a randomized controlled trial (RCT) and borrows information from an observational study (OS) whose covariates only partly overlap the trial's. Baseline-bias and comparative-bias functions describe how the OS departs from the trial, and the prior on the comparative-bias function limits how much OS treatment-contrast information can reach the trial CATE. All experiments use the closed-form Gaussian version of the model. Unless a script says otherwise, B-CALM averages over six comparative-bias prior scales with fixed prior weights (`SIGMA_GRID` and `SIGMA_MODEL_PRIOR` in `code/baselines.py`) and posterior weights from the trial-versus-OS contrast.
 
-Requires **Python 3.10**.
+## Citation
+
+```bibtex
+@inproceedings{asiaee2026bcalm,
+  title         = {{B-CALM}: Bias-Limited Bayesian Borrowing for {RCT}-Defined Conditional Average Treatment Effects under Covariate Mismatch},
+  author        = {Asiaee, Amir and Pal, Samhita},
+  booktitle     = {Advances in Neural Information Processing Systems},
+  year          = {2026},
+  eprint        = {2607.04036},
+  archivePrefix = {arXiv}
+}
+```
+
+Preprint: [arXiv:2607.04036](https://arxiv.org/abs/2607.04036).
+
+## Repository layout
+
+- `code/`: the model (`bcalm.py`), data-generating processes (`dgp.py`), metrics, baselines (`baselines.py`), experiment runners (`run_*.py`), and table and figure builders (`make_*.py`).
+- `code/third_party/qr_learner/`: the vendored QR-learner used for one comparison (see Third-party code).
+- `results/`: the result CSVs behind the synthetic and semi-synthetic results in the paper.
+- `notebooks/reproduce.ipynb`: runs the core synthetic and semi-synthetic experiments in order and builds their figures and tables.
+
+Tables and figures are written to `tables/` and `figures/` at the repository root. Both directories are created on the first run and are not tracked.
+
+## Installation
+
+The code was run with Python 3.10.
 
 ```bash
 pip install -r code/requirements.txt
 ```
 
-`econml` is only needed for the CF (causal forest) baseline; every B-CALM, RCT-only, pooled, and OS-only experiment runs without it.
-
-## Reproduce
-
-The easiest path is the notebook:
+`econml` is needed only for the causal-forest (CF) baseline. If it is missing, the runners skip CF and log a message. The real-data analysis needs two more packages (`pyreadr`, and `pymc` with `pymc-bart` for the BCF comparator):
 
 ```bash
-jupyter notebook notebooks/reproduce.ipynb
+pip install -r code/requirements-realdata.txt
 ```
 
-It installs dependencies, runs each experiment, and builds the figures and tables in order.
+The R-OSCAR, MR-OSCAR, and CALM baselines are prior work (arXiv:2306.17478, arXiv:2603.17066, and arXiv:2603.19186). Their implementation is in the companion repository [AsiaeeLab/calm-cate](https://github.com/AsiaeeLab/calm-cate), which this code imports through an environment variable:
 
-To run the pieces directly from the command line, work inside `code/` (the runners resolve `results/`, `figures/`, and `tables/` relative to the package root):
+```bash
+git clone https://github.com/AsiaeeLab/calm-cate.git
+export BCALM_EXTERNAL_CALM_PATH=/path/to/calm-cate
+```
+
+`BCALM_EXTERNAL_CALM_PATH` must point at the root of the checkout, the directory that contains `src/`. Without it, the synthetic runners skip these three baselines and log a message, and everything else runs.
+
+## Reproducing the results
+
+Run the scripts from `code/`. Each script writes to `results/`, `tables/`, or `figures/` at the repository root regardless of the working directory; the newer scripts also accept `--out-dir` (and `--table-dir` or `--figure-dir` where relevant).
+
+`results/` already contains the paper's CSVs, so the table and figure builders in steps 2 and 4 can run immediately. The core runners `run_main.py`, `run_saturation.py`, `run_semi.py`, and `run_ablation.py` resume from rows already present in their output file. To regenerate everything, move `results/` aside first. Steps 3 and 4 read `results/main.csv` and `results/ablation.csv`, so regenerate those before running them.
+
+The times below are approximate wall-clock times from the paper runs on a single workstation. The core runners used their default `--workers 10` for the OSCAR/CALM bootstrap; the additional experiments in step 3 used 5 workers.
+
+**Step 1. Core synthetic and semi-synthetic experiments.** Each runner accepts `--mode {smoke,cheap,full}`: `smoke` is an end-to-end check that takes seconds, and `full` uses the paper's settings.
 
 ```bash
 cd code
-python run_saturation.py  --mode full
-python run_main.py        --mode full
-python run_calibration.py --mode full
-python run_semi.py        --mode full
-python run_ablation.py    --mode full
-python make_figures.py
-python make_tables.py
+python run_saturation.py  --mode full   # about 25 s
+python run_main.py        --mode full   # about 5 h with all baselines; the B-CALM rows alone take about 2 min
+python run_calibration.py --mode full   # about 25 min
+python run_semi.py        --mode full   # about 5 min
+python run_ablation.py    --mode full   # a few seconds
 ```
 
-Every runner accepts `--mode {smoke,cheap,full}`. Use `smoke` for a fast end-to-end check (seconds), `cheap` for an intermediate run, and `full` to reproduce the paper numbers. The figure and table builders read the `full`-mode CSV filenames, so run the experiments in `full` mode before building artifacts.
+Most of the time in `run_main.py`, `run_calibration.py`, and `run_semi.py` goes to the 200-resample bootstrap for the OSCAR/CALM baselines and to CF.
 
-## What is and isn't included
+**Step 2. Figures and tables for the core experiments** (a few seconds in total).
 
-- **Synthetic experiments** (saturation, main grid, calibration, ablations): fully reproducible from this package.
-- **Semi-synthetic STAR-like benchmark**: fully reproducible from this package.
-- **Real-data pediatric-obesity analysis**: **excluded.** It uses patient-level EHR/trial data that cannot be released for IRB/DUA reasons. The corresponding analysis code is also excluded; it is available on request to the authors for readers with appropriate data access.
-- **OSCAR/CALM-family baselines** (R-OSCAR, MR-OSCAR, CALM): these are prior works whose code lives in separate companion repositories. They are skipped automatically unless you check out the companion code and set the environment variable `BCALM_EXTERNAL_CALM_PATH` to its path. References:
-  - R-OSCAR: arXiv:2306.17478
-  - MR-OSCAR: arXiv:2603.17066
-  - CALM: arXiv:2603.19186
+```bash
+python make_figures.py                 # saturation, bias sweep, calibration, semi-synthetic sensitivity
+python make_tables.py                  # per-cell main table, saturation table, semi-synthetic table
+python make_tables.py --summary-only   # main simulation summary table
+```
 
-## Outputs → paper
+**Step 3. Additional synthetic experiments.**
 
-| Result CSV | Figures / tables produced |
-|---|---|
-| `results/main.csv` | Table 1, the full main results `tables/main.tex`, and `figures/bias_sweep.pdf` |
-| `results/saturation.csv` | `figures/saturation.pdf` and saturation table `tables/saturation.tex` |
-| `results/calibration.csv` | `figures/calibration.pdf` |
-| `results/semi.csv`, `results/semi_sensitivity.csv` | semi table `tables/semi.tex` and `figures/semi_sensitivity.pdf` |
-| `results/ablation.csv` | ablation table `tables/ablation.tex` |
-| `results/bma_weights.csv` | per-replicate BMA weight diagnostic (written by `run_main.py`; not a paper artifact) |
+```bash
+python run_commensurate.py              # scalar commensurate and robust-MAP comparison, about 5 s
+python run_qr_learner.py                # QR-learner benchmark, about 15 s
+python run_operating_characteristics.py # Go/No-Go operating characteristics, about 100 s
+python run_prior_weights.py             # prior-weight sensitivity over the full grid, about 17 s
+python run_overlap.py                   # MMD along the alignment ladder, about 20 s
+```
+
+`run_prior_weights.py` stops with an error unless its fit under the default prior weights reproduces the B-CALM rows of `results/main.csv`. `run_commensurate.py --validate-only` and `run_qr_learner.py --validate-only` fit a single seed as a quick check. The raw per-seed output of `run_operating_characteristics.py` (about 10 MB) is not shipped; `python run_operating_characteristics.py --tables-only` rebuilds its tables from the shipped summary.
+
+**Step 4. Regrouped and remaining tables** (under a second each).
+
+```bash
+python make_regime_tables.py      # results by bias regime, alignment ladder, OSCAR-family precision
+python make_additional_tables.py  # ablation, scalar-discrepancy, and QR-learner tables
+```
+
+Run `make_additional_tables.py` after `make_tables.py`: both write `tables/ablation.tex`, and the version from `make_additional_tables.py` is the one in the paper.
+
+**Step 5. Real-data application** (restricted data; see Data availability). These scripts also need `BCALM_EXTERNAL_CALM_PATH` and `econml` for the comparator rows.
+
+```bash
+export GPS_CLEAN_DIR=/path/to/greenlight-plus/clean
+python run_gps_main.py                  # about 6 min, including BCF
+python run_gps_loo.py                   # a few seconds
+python run_gps_bias.py                  # about 8 s
+python run_gps_bias_susceptibility.py
+python run_gps_closed_form.py --out-dir ../results/gps_exact   # about 3 s
+python run_overlap.py                   # adds the real-data MMD row
+python make_regime_tables.py            # adds the real-data ATE row to the OSCAR-family precision table
+```
+
+`run_gps_closed_form.py` reads the outputs of the four preceding scripts, recomputes the B-CALM, RCT-only, and pooled summaries as exact Gaussian functionals, and writes the four real-data tables and the sensitivity figure in the paper's layout. With `--out-dir` it leaves the Monte Carlo summaries in `results/` unchanged.
+
+## Paper-to-code map
+
+Some tables in the paper combine or reformat the generated LaTeX. For example, the alignment-ladder table in the paper merges `tables/alignment_ladder.tex` and `tables/overlap.tex`.
+
+| Paper content | Scripts | Result files | Generated tables and figures |
+|---|---|---|---|
+| Main simulation summary and per-cell table | `run_main.py`, `make_tables.py` | `results/main.csv` | `tables/main_summary.tex`, `tables/main.tex` |
+| Per-replicate posterior weights over prior scales | `run_main.py` | `results/bma_weights.csv` | none |
+| Comparative-bias sweep figure | `run_main.py`, `make_figures.py` | `results/main.csv` | `figures/bias_sweep.pdf` |
+| Saturation (effective sample size) | `run_saturation.py`, `make_figures.py`, `make_tables.py` | `results/saturation.csv` | `figures/saturation.pdf`, `tables/saturation.tex` |
+| Ablation | `run_ablation.py`, `make_additional_tables.py` | `results/ablation.csv` | `tables/ablation.tex` |
+| Calibration curves | `run_calibration.py`, `make_figures.py` | `results/calibration.csv` | `figures/calibration.pdf` |
+| STAR-like semi-synthetic benchmark and sensitivity figure | `run_semi.py`, `make_tables.py`, `make_figures.py` | `results/semi.csv`, `results/semi_sensitivity.csv` | `tables/semi.tex`, `figures/semi_sensitivity.pdf` |
+| OSCAR-family precision | `make_regime_tables.py` | `results/oscar_precision.csv`, `results/oscar_seed_differences.csv`, `results/baseline_distinctness.json`, `results/baseline_distinctness_gridmeans.csv` | `tables/oscar_precision.tex` |
+| Results by bias regime | `make_regime_tables.py` | `results/by_bias_regime.csv` | `tables/by_regime.tex` |
+| Alignment ladder and MMD diagnostic | `make_regime_tables.py`, `run_overlap.py` | `results/by_alignment_regime.csv`, `results/overlap_ladder.csv`, `results/overlap_ladder_raw.csv` | `tables/alignment_ladder.tex`, `tables/overlap.tex` |
+| Scalar and robust-MAP comparison | `run_commensurate.py`, `make_additional_tables.py` | `results/commensurate_baseline.csv`, `results/commensurate_baseline_summary.csv` | `tables/scalar_bias.tex` |
+| QR-learner benchmark | `run_qr_learner.py`, `make_additional_tables.py` | `results/qr_learner_benchmark.csv`, `results/qr_learner_benchmark_summary.csv` | `tables/qr_learner.tex` |
+| Go/No-Go operating characteristics | `run_operating_characteristics.py` | `results/operating_characteristics_summary.csv` | `tables/oc_main.tex`, `tables/oc_fixed_sigma.tex` |
+| Prior-weight sensitivity | `run_prior_weights.py` | `results/prior_weights.csv`, `results/prior_weights_raw.csv` | `tables/prior_weights.tex` |
+| Real-data application (restricted data) | `run_gps_main.py`, `run_gps_loo.py`, `run_gps_bias.py`, `run_gps_bias_susceptibility.py`, `run_gps_closed_form.py` | not distributed | `tables/gps_main.tex`, `tables/gps_loo.tex`, `tables/gps_bias.tex`, `tables/gps_bias_susceptibility.tex`, `tables/gps_sensitivity.tex`, `figures/gps_sensitivity.pdf`, `figures/gps_loo.pdf` |
+
+`results/run_times.json` records the wall-clock time of the last run of each core runner and builder.
+
+## Data availability
+
+The synthetic data (`generate_data` in `code/dgp.py`) and the STAR-like semi-synthetic data (`generate_star_like` in `code/dgp.py`) are generated by the code from fixed seeds, so no data files are needed for those experiments.
+
+The real-data application uses Greenlight Plus trial data and linked electronic health record (EHR) data on usual-care children at three of the trial's sites. The Greenlight Plus trial was funded by the Patient-Centered Outcomes Research Institute (PCORI), contract AD-2018C1-11238; we thank William J. Heerman and Lee M. Sanders for the trial and the data resource. These data cannot be shared, and this repository contains no data files, real-data results, real-data figures or tables, or fitted objects. The code runs only for users with authorized access to the data. Set `GPS_CLEAN_DIR` to a directory that contains two R data files:
+
+- `cate_rct_cross_sectional_data.rds`, one row per trial participant, with columns `site`, `treatment`, `sex`, `race_ethnicity`, `language`, `insurance`, `wflz_baseline`, `wflz_12m`, `food_security`, `education`, `income`, `health_literacy`, and `birth_weight`.
+- `cate_ehr_cross_sectional_data.rds`, one row per EHR child, with columns `site`, `sex`, `race_ethnicity`, `language`, `insurance`, `wflz_baseline`, and `wflz_12m`.
+
+The loader (`code/gps_data.py`) keeps trial rows from the sites `Duke`, `UNC`, and `Vanderbilt`, codes the treated arm as `treatment == "Clinic + Digital Intervention"`, sets the treatment indicator to 0 for every EHR row (external controls), clips `wflz_baseline` to [-5, 5], and keeps complete cases on the six shared covariates (`site`, `sex`, `race_ethnicity`, `language`, `insurance`, `wflz_baseline`) and the outcome `wflz_12m`. The paper's analysis has 385 trial and 15,150 EHR rows after these steps. If `GPS_CLEAN_DIR` is not set, the `run_gps_*.py` scripts stop with an error and `run_overlap.py` skips its real-data row; `make_regime_tables.py` skips its real-data row when `results/gps_main_summary.csv` does not exist. `.gitignore` excludes `data/`, `*.rds`, `results/gps_*`, `tables/`, and `figures/` so that real-data outputs stay local.
+
+## Third-party code
+
+`code/third_party/qr_learner/official_learners.py` is `src/randomization_aware/learners.py` from [RickardKarl/robust-trial-CATE-augmentation](https://github.com/RickardKarl/robust-trial-CATE-augmentation) at commit `6a62bd6b0bbf8e90c43d4108c3be227b3e4c0e6a`, included unmodified under its MIT license (`code/third_party/qr_learner/LICENSE`, Copyright (c) 2025 Rickard Karlsson). It is used only by `run_qr_learner.py` for the QR-learner comparison. The method is described in Karlsson et al., "Robust Estimation of Heterogeneous Treatment Effects in Randomized Trials Leveraging External Data," AISTATS 2026.
+
+## License
+
+MIT. See `LICENSE`. The vendored QR-learner keeps its own MIT license.

@@ -130,19 +130,31 @@ def dump_failure(seed: int, config: Mapping[str, object], exc: BaseException) ->
     return path
 
 
-def record_wallclock(experiment: str, seconds: float, details: Mapping[str, object] | None = None) -> None:
+def _portable(value: object) -> object:
+    """Store paths inside the repository relative to its root."""
+    if isinstance(value, (str, Path)) and Path(value).is_absolute():
+        try:
+            return str(Path(value).resolve().relative_to(ROOT))
+        except ValueError:
+            return Path(value).name
+    return value
+
+
+def record_wallclock(experiment: str, seconds: float, details: Mapping[str, object] | None = None, *, out_dir: Path | None = None) -> None:
     ensure_dirs()
-    if RUN_TIMES.exists():
-        payload = json.loads(RUN_TIMES.read_text())
+    output = RUN_TIMES if out_dir is None else Path(out_dir) / "run_times.json"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    if output.exists():
+        payload = json.loads(output.read_text())
     else:
         payload = {}
     payload[experiment] = {
         "timestamp": timestamp(),
         "seconds": float(seconds),
         "formatted": format_seconds(seconds),
-        "details": dict(details or {}),
+        "details": {key: _portable(value) for key, value in dict(details or {}).items()},
     }
-    RUN_TIMES.write_text(json.dumps(payload, indent=2, sort_keys=True))
+    output.write_text(json.dumps(payload, indent=2, sort_keys=True))
 
 
 def progress(index: int, total: int, start_time: float, label: str, every: int = 25) -> None:

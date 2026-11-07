@@ -1,0 +1,7 @@
+# Extra dependencies for the restricted real-data analysis (run_gps_*.py).
+# Install on top of requirements.txt.
+-r requirements.txt
+pyreadr==0.5.4
+# pymc and pymc-bart are only needed for the BCF comparator.
+pymc==5.23.0
+pymc-bart==0.9.2

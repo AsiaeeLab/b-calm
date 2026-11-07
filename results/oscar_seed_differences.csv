@@ -1,0 +1,6 @@
+metric,max_abs_pairwise_diff,n_seed_cells,frac_seed_cells_with_any_diff,n_differing
+cate_rmse,6.313500000021399e-06,1200,1.0,1200
+coverage_90,0.0016666667000000412,1200,0.0016666666666666668,2
+ci_width,3.868100000081753e-06,1200,1.0,1200
+neg_transfer,0.0,1200,0.0,0
+iae,4.899599999996784e-06,1200,1.0,1200

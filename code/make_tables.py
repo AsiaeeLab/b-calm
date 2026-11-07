@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import math
+import argparse
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -199,10 +201,8 @@ def write_ablation() -> None:
         "tab:ablation",
     )
     lines += ["\\begin{tabular}{lrrrr}", "\\toprule", "Variant & Coverage & Neg. transfer & RMSE & Width \\\\", "\\midrule"]
-    # No per-cell emphasis: the mechanical lowest-NT / closest-coverage rules
-    # crown a degraded surrogate variant here and mislead; list Full B-CALM
-    # first and let the numbers speak.
-    variant_order = ["Full B-CALM", "Deterministic encoders", "No b0", "No b_delta", "Point plus bootstrap"]
+    # No per-cell emphasis; Full B-CALM is listed first.
+    variant_order = ["Full B-CALM", "No b0", "No b_delta"]
     agg["variant_rank"] = agg["variant"].map({v: i for i, v in enumerate(variant_order)}).fillna(99)
     for _, row in agg.sort_values("variant_rank").iterrows():
         lines.append(
@@ -212,7 +212,44 @@ def write_ablation() -> None:
     (TABLES_DIR / "ablation.tex").write_text("\n".join(lines))
 
 
+MAIN_SUMMARY_CAPTION = (
+    "Synthetic factorial study: metric averages over the full condition grid ($24$ cells $\\times$ $50$ replicates; "
+    "Appendix~\\ref{app:dgp-synthetic}). Cov.\\ and Width refer to pointwise 90\\% credible intervals evaluated on "
+    "trial-distribution covariates; NT is the negative-transfer rate relative to RCT-only. R-OSCAR, MR-OSCAR, and CALM "
+    "are reported separately. Per-cell results: Appendix~\\ref{app:main-table}, Table~\\ref{tab:main}."
+)
+MAIN_SUMMARY_ORDER = ["B-CALM", "R-OSCAR", "MR-OSCAR", "CALM", "RCT-only", "pooled", "OS-only", "CF"]
+
+
+def write_main_summary(out_dir: Path = TABLES_DIR) -> None:
+    """Write the factorial summary with a separate row for each method."""
+    df = pd.read_csv(RESULTS_DIR / "main.csv")
+    summary = df.groupby("method")[["cate_rmse", "coverage_90", "ci_width", "neg_transfer"]].mean()
+    lines = table_header(MAIN_SUMMARY_CAPTION, "tab:main_summary")
+    lines += ["\\begin{tabular}{@{}lrrrr@{}}", "\\toprule", "Method   & RMSE  & Cov. & Width & NT \\\\", "\\midrule"]
+    for method in MAIN_SUMMARY_ORDER:
+        if method not in summary.index:
+            continue
+        r = summary.loc[method]
+        lines.append(f"{method:<18}& {r.cate_rmse:.3f} & {r.coverage_90:.3f} & {r.ci_width:.3f} & {r.neg_transfer:.3f} " + r"\\")
+    lines += ["\\bottomrule", "\\end{tabular}"] + table_footer()
+    out_dir.mkdir(parents=True, exist_ok=True)
+    (out_dir / "main_summary.tex").write_text("\n".join(lines))
+    log(f"main_summary: {len(summary)} methods")
+
+
 def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--out-dir", type=Path, default=TABLES_DIR)
+    parser.add_argument("--summary-only", action="store_true")
+    args = parser.parse_args()
+    if args.summary_only:
+        timer = Timer("main summary")
+        write_main_summary(args.out_dir)
+        log(f"wall_clock_seconds={timer.finish():.6f}")
+        return
+    if args.out_dir != TABLES_DIR:
+        raise ValueError("Use --summary-only with a custom output directory")
     ensure_dirs()
     timer = Timer("tables")
     write_saturation()

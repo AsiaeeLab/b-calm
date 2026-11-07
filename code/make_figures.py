@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import math
+import argparse
+from pathlib import Path
 
 import matplotlib
 
@@ -50,6 +52,7 @@ def saturation() -> None:
     handles, labels = axes[-1].get_legend_handles_labels()
     fig.legend(handles, labels, loc="lower center", ncol=min(len(labels), 4), bbox_to_anchor=(0.5, -0.02), fontsize=8, frameon=False)
     fig.tight_layout(rect=(0, 0.06, 1, 1))
+    log("saturation.pdf: " + repr([ax.get_legend_handles_labels()[1] for ax in axes]))
     fig.savefig(FIGURES_DIR / "saturation.pdf", bbox_inches="tight")
     plt.close(fig)
 
@@ -72,6 +75,7 @@ def calibration() -> None:
     ax.grid(True, alpha=0.2)
     ax.legend(fontsize=8, frameon=False)
     fig.tight_layout()
+    log("calibration.pdf: " + repr(ax.get_legend_handles_labels()[1]))
     fig.savefig(FIGURES_DIR / "calibration.pdf")
     plt.close(fig)
 
@@ -82,7 +86,7 @@ def bias_sweep() -> None:
         df["bias_strength"] = np.where(df["bias"].eq("comparative"), 0.2, 0.0)
     df["bias_strength"] = df["bias_strength"].astype(float)
     sub = df[(df["dgp"] == "balanced") & (df["bias"] == "comparative") & (df["n_R"] == df["n_R"].max())].copy()
-    # MR-OSCAR, R-OSCAR, and CALM coincide to within Monte Carlo noise in this
+    # MR-OSCAR, R-OSCAR, and CALM differ by less than 1e-4 at every point in this
     # harness; plot MR-OSCAR rows under the collapsed OSCAR/CALM label.
     methods = ["B-CALM", "OSCAR/CALM", "pooled", "CF", "RCT-only"]
     source = {"OSCAR/CALM": "MR-OSCAR"}
@@ -93,7 +97,8 @@ def bias_sweep() -> None:
         "CF": dict(color="#ff7f0e", linestyle=":", marker="D", linewidth=1.6, zorder=3),
         "RCT-only": dict(color="#111111", linestyle="-", marker="x", linewidth=0.9, zorder=2),
     }
-    fig, axes = plt.subplots(1, 2, figsize=(7.0, 2.6))
+    plt.rcParams.update({"font.size": 8})
+    fig, axes = plt.subplots(1, 2, figsize=(4.2, 1.9))
     for metric, ax, ylabel in [("cate_rmse", axes[0], "CATE RMSE"), ("coverage_90", axes[1], "90% coverage")]:
         for method in methods:
             g = sub[sub["method"] == source.get(method, method)].groupby("bias_strength", as_index=False)[metric].mean()
@@ -102,15 +107,17 @@ def bias_sweep() -> None:
             g = g.sort_values("bias_strength")
             ax.plot(g["bias_strength"], g[metric], markersize=4, label=method, **styles[method])
         ax.set_xticks([0.0, 0.2, 0.5, 1.0])
-        ax.set_xlabel("Comparative-bias strength")
+        ax.set_xlabel("Comparative-bias strength", fontsize=7)
         ax.set_ylabel(ylabel)
         ax.grid(True, alpha=0.2)
     axes[1].axhline(0.90, color="#555555", linewidth=0.8, linestyle=(0, (2, 3)), alpha=0.8)
     axes[1].set_ylim(0.0, 1.02)
-    axes[0].legend(fontsize=7.5, frameon=False)
+    axes[0].legend(fontsize=6, frameon=False)
     fig.tight_layout()
+    log("bias_sweep.pdf: " + repr([ax.get_legend_handles_labels()[1] for ax in axes]))
     fig.savefig(FIGURES_DIR / "bias_sweep.pdf")
     plt.close(fig)
+    plt.rcParams.update({"font.size": 10})
 
 
 def semi_sensitivity() -> None:
@@ -130,11 +137,22 @@ def semi_sensitivity() -> None:
     ax.grid(True, alpha=0.2)
     ax.legend(fontsize=6.5, frameon=False, ncol=2, loc="upper left")
     fig.tight_layout()
+    log("semi_sensitivity.pdf: " + repr(ax.get_legend_handles_labels()[1]))
     fig.savefig(FIGURES_DIR / "semi_sensitivity.pdf")
     plt.close(fig)
 
 
 def main() -> None:
+    global FIGURES_DIR
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--out-dir", type=Path, default=FIGURES_DIR)
+    parser.add_argument("--truetype", action="store_true")
+    args = parser.parse_args()
+    FIGURES_DIR = args.out_dir
+    FIGURES_DIR.mkdir(parents=True, exist_ok=True)
+    if args.truetype:
+        matplotlib.rcParams["pdf.fonttype"] = 42
+        matplotlib.rcParams["ps.fonttype"] = 42
     ensure_dirs()
     timer = Timer("figures")
     saturation()
@@ -142,7 +160,7 @@ def main() -> None:
     calibration()
     semi_sensitivity()
     seconds = timer.finish()
-    record_wallclock("figures", seconds)
+    record_wallclock("figures", seconds, out_dir=args.out_dir if args.out_dir != RESULTS_DIR.parent / "figures" else None)
     log(f"wrote figures to {FIGURES_DIR}")
 
 
