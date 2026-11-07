@@ -92,8 +92,7 @@ def write_main() -> None:
         "under no bias because pooling is variance-optimal there, but their coverage collapses "
         "under comparative bias. R-OSCAR, MR-OSCAR, and CALM differ by less than $10^{-4}$ in every cell "
         "of this implementation and are merged into a single OSCAR/CALM row; the family sits just below "
-        "nominal coverage on average while declining to borrow under bias. The Hahn Bayesian "
-        "causal forest (BCF) is run only in the real-data analysis. Bias-limited width saturation "
+        "nominal coverage on average while declining to borrow under bias. Bias-limited width saturation "
         "is guaranteed by Corollary~\\ref{thm:scalar}."
     )
     lines = [

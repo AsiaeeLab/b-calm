@@ -125,15 +125,6 @@ def precision(df: pd.DataFrame, out: Path, table: Path, reference: Path | None) 
         log(f"baseline_distinctness JSON exact={result == old}")
         if result != old:
             raise AssertionError("Baseline precision did not reproduce")
-    # The real-data row needs the restricted-data output of run_gps_main.py.
-    gps_path = RESULTS_DIR / "gps_main_summary.csv"
-    gps = None
-    if gps_path.exists():
-        gps = pd.read_csv(gps_path)
-        gps = gps[gps.method.isin(FAM)][["method", "ate_mean"]]
-        gps.to_csv(out / "oscar_realdata.csv", index=False)
-    else:
-        log(f"{gps_path.name} not found; omitting the real-data ATE row")
     rows = []
     for k in METRICS[:4]:
         means = " & ".join(f"{summary[k]['values'][m]:.9g}" for m in FAM)
@@ -147,13 +138,6 @@ def precision(df: pd.DataFrame, out: Path, table: Path, reference: Path | None) 
         rows.append(
             f"{r.metric.replace('_', chr(92) + '_')} max diff & {r.max_abs_pairwise_diff:.9g} & {r.n_differing}/{r.n_seed_cells} & --"
         )
-    if gps is not None:
-        rows.append(
-            "GPS ATE & "
-            + " & ".join(
-                f"{gps.loc[gps.method.eq(m), 'ate_mean'].iloc[0]:.7f}" for m in FAM
-            )
-        )
     write_table(
         table / "oscar_precision.tex",
         "OSCAR-family precision. MC SE combines within-cell seed variances with equal cell weights. Difference rows give the maximum pairwise difference and the number of differing seed-cells.",
@@ -164,8 +148,6 @@ def precision(df: pd.DataFrame, out: Path, table: Path, reference: Path | None) 
     )
     log(gm.to_string(index=False))
     log(seeds.to_string(index=False))
-    if gps is not None:
-        log(gps.to_string(index=False))
 
 
 def main() -> None:

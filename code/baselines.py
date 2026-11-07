@@ -335,7 +335,7 @@ class BcfHahnCate:
 
         BART posteriors are evaluated at training X. For new X, we use 1-NN
         lookup on the pooled training X to project posterior tau draws onto X_eval.
-        Cheap, deterministic, and adequate for the real-data-scale evaluation.
+        Cheap and deterministic.
         """
         from sklearn.neighbors import NearestNeighbors
         nn = NearestNeighbors(n_neighbors=1).fit(self.x_template)

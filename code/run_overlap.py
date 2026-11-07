@@ -1,9 +1,8 @@
-"""Distributional discrepancy for synthetic alignment regimes and GPS controls."""
+"""Distributional discrepancy for the synthetic alignment regimes."""
 
 from __future__ import annotations
 
 import argparse
-import os
 from pathlib import Path
 import time
 import numpy as np
@@ -77,28 +76,7 @@ def main() -> None:
         f"{r.dgp} & {r.representation} & {r.mmd2_mean:.4f} $\\pm$ {r.mmd2_sd:.4f} & {r.mmd_mean:.4f} $\\pm$ {r.mmd_sd:.4f} & {r.bandwidth_mean:.3f} & {r.reject_fraction:.2f}"
         for r in summary.itertuples()
     ]
-    real = None
-    # The real-data row needs the restricted Greenlight Plus files (GPS_CLEAN_DIR).
-    if os.environ.get("GPS_CLEAN_DIR"):
-        from gps_data import load_gps
-        from gps_real_utils import prepare_gps
-
-        loaded = load_gps()
-        rct, ehr, _ = prepare_gps(loaded)
-        log(
-            f"GPS full sample: n_R={len(rct['Y'])}, n_O={len(ehr['Y'])}; shared columns={loaded['shared_cols']}"
-        )
-        real = pd.DataFrame([gaussian_mmd(rct["X"], ehr["X"])])
-        real.to_csv(args.out_dir / "overlap_realdata.csv", index=False)
-        r = real.iloc[0]
-        rows.append(
-            f"GPS & shared & {r.mmd2:.4f} & {r.mmd:.4f} & {r.bandwidth:.3f} & {r.permutation_p:.4f}"
-        )
-    else:
-        log("GPS_CLEAN_DIR is not set; writing the synthetic rows only")
     caption = "Gaussian-kernel discrepancy. Synthetic entries show mean and SD over 50 seeds; last column is the fraction with permutation $p<0.05$."
-    if real is not None:
-        caption += " The GPS row shows the permutation $p$-value."
     caption += " Tests subsample the larger group to 2,000 observations; discrepancy estimates use the full groups."
     write_table(
         args.table_dir / "overlap.tex",
@@ -109,8 +87,6 @@ def main() -> None:
         rows,
     )
     log(summary.to_string(index=False))
-    if real is not None:
-        log(real.to_string(index=False))
     log(f"wall_clock_seconds={time.time() - start:.6f}")
 
 

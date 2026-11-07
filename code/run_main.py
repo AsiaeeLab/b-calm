@@ -112,8 +112,7 @@ def main() -> None:
     sweep_methods = filter_methods(["B-CALM-selected", "RCT-only", "CF", "MR-OSCAR", "R-OSCAR", "CALM", "pooled"])
     # BCF (Hahn 2020) is skipped in the synthetic factorial grid: each fit takes
     # roughly 30 s to 2 min depending on n, which is prohibitive over the full
-    # grid of cells and seeds. BCF is reported in the paper's real-data
-    # application, where a single fit is feasible.
+    # grid of cells and seeds.
     n_O = 5000 if args.mode != "smoke" else 160
     total = len(cells) * len(n_R_grid) * len(seeds)
     start = time.time()
